@@ -14,7 +14,9 @@ Gem::Specification.new do |s|
   s.rubyforge_project = "kickstarter"
 
   s.add_dependency "nokogiri"
-  s.add_development_dependency "fakeweb"
+  s.add_dependency "em-http-request"
+  s.add_development_dependency "webmock"
+  s.add_development_dependency "rspec"
   
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
