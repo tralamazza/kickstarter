@@ -1,3 +1,5 @@
+require 'date'
+
 module Kickstarter
   
   class Project
@@ -24,7 +26,6 @@ module Kickstarter
       @url ||= File.join(Kickstarter::BASE_URL, link.attribute('href').to_s.split('?').first)
     end
     
-    
     def owner
       @owner ||= node.css('h2 span').first.inner_html.gsub(/by/, "").strip
     end
@@ -43,8 +44,6 @@ module Kickstarter
     def pledge_percent
       @pledge_percent ||= node.css('.project-stats li strong').inner_html.gsub(/\,/,"").to_i
     end
-    
-
 
 #     # can be X days|hours left
     # or <strong>FUNDED</strong> Aug 12, 2011
@@ -61,7 +60,6 @@ module Kickstarter
         end
       end
     end
-    
 
     def to_hash
       {

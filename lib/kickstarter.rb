@@ -1,33 +1,17 @@
 require 'rubygems'
 require "nokogiri"
-require 'open-uri'
-require 'date'
+require "em-http-request"
 require "kickstarter/version"
 require "kickstarter/project"
 
 module Kickstarter
-  BASE_URL = "http://kickstarter.com"  
-  
-  Categories = {
-    :art         => "art",
-    :comics      => "comics",
-    :dance       => "dance",
-    :design      => "design",
-    :fashion     => "fashion",
-    :film_video  => "film%20&%20video",
-    :food        => "food",
-    :games       => "games",
-    :music       => "music",
-    :photography => "photography",
-    :technology  => "technology",
-    :theatre     => "theater",
-    :writing     => "writing%20&%20publishing"
-  }
-  
+  BASE_URL = "http://www.kickstarter.com"
+
   Type = {
     :recommended => 'recommended', 
     :popular     => 'popular', 
-    :successful  => 'successful'
+    :successful  => 'successful',
+    :most_funded => 'most-funded'
   }
   
   Lists = {
@@ -38,49 +22,81 @@ module Kickstarter
     :small_projects    => "small-projects",
     :most_funded       => "most-funded",
     :curated           => "curated-pages",
+    :successful        => 'successful'
   }
-   
+
+  # Kickstarter.categories |name, url_path_name|
+  #   puts name
+  # end
+  def self.categories(&block)
+    EM.run do
+      http = EM::HttpRequest.new(BASE_URL).get
+      http.errback { EM.stop }
+      http.callback do
+        Nokogiri::HTML(http.response).css("h5 + ul.list-footer-categories, h5 + ul + ul").each do |node|
+          node.css("a").each do |node_cat|
+            block.call(node_cat.text, node_cat["href"].match(/discover\/categories\/(.*)\?/)[1])
+          end
+        end # Nokogiri::HTML
+        EM.stop
+      end # http.callback
+    end # EM.run
+  end
+
   # by category
   # /discover/categories/:category/:subcategories 
-  #  :type # => [recommended, popular, successful]
-  def self.by_category(category, options = {})
-    path = File.join(BASE_URL, 'discover/categories', Categories[category.to_sym], Type[options[:type] || :popular])
-    list_projects(path, options)
+  #  :type # => [recommended, popular, successful, most_funded]
+  def self.by_category(category, options = {}, &block)
+    path = File.join(BASE_URL, 'discover/categories', category, Type[options[:type] || :popular])
+    list_projects(path, options, &block)
   end
-  
+
   # by lists
   # /discover/:list
-  def self.by_list(list, options = {})
+  def self.by_list(list, options = {}, &block)
     path = File.join(BASE_URL, 'discover', Lists[list.to_sym])
-    list_projects(path, options)
+    list_projects(path, options, &block)
   end
   
   private
-  
-  def self.list_projects(url, options = {})
-    pages = options.fetch(:pages, 0)
-    pages -= 1 unless pages == 0 || pages == :all
 
+  def self.list_projects(url, options = {}, &block)
     start_page = options.fetch(:page, 1)
-    end_page   = pages == :all ? 10000 : start_page + pages
 
-    results = []
-
-    (start_page..end_page).each do |page|
-      retries = 0
-      begin
-        doc = Nokogiri::HTML(open("#{url}?page=#{page}"))
+    EM.run do
+      http = EM::HttpRequest.new("#{url}?page=#{start_page}").get
+      http.errback { EM.stop }
+      http.callback do
+        doc = Nokogiri::HTML(http.response)
         nodes = doc.css('.project')
-        break if nodes.empty?
-
-        nodes.each do |node|
-          results << Kickstarter::Project.new(node)
+        if nodes.empty?
+          EM.stop
+          return
         end
-      rescue Timeout::Error
-        retries += 1
-        retry if retries < 3
-      end
-    end
-    results
+        nodes.each { |node| block.call( Kickstarter::Project.new(node) ) }
+
+        start_page += 1 # skip the one we just read
+        pages = options.fetch(:pages, :all)
+        end_page = doc.css(".pagination a:nth-last-of-type(2)").text.to_i
+        end_page = start_page + pages - 2 unless pages == :all
+        EM.stop if start_page > end_page
+
+        processed = 0 # counter
+        # create one request per page
+        multi = (start_page .. end_page).map { |p| EM::HttpRequest.new("#{url}?page=#{p}").get }
+        multi.each do |multi_http|
+          multi_http.callback do
+            nodes = Nokogiri::HTML(multi_http.response).css('.project')
+            nodes.each { |node|
+              block.call(Kickstarter::Project.new(node))
+            } unless nodes.empty?
+            processed += 1
+            EM.stop if processed == multi.length
+          end
+        end # multi.each do |multi_http|
+
+      end # http.callback
+    end # EM.run do
   end
+
 end
