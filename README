@@ -1,4 +1,4 @@
-Kickstart
+Kickstarter
 a simple API for Kickstarter.com
 
 Usage:
@@ -10,7 +10,7 @@ Usage:
     # => returns back an array of 3 pages worth of projects, starting from page 2
 
 
-A Kickstart::Project has the following attributes:
+A Kickstarter::Project has the following attributes:
   .name
   .handle
   .description
@@ -19,7 +19,7 @@ A Kickstart::Project has the following attributes:
   .email
   .thumbnail_url
   .pledge_amount
-  .pledge_precent
+  .pledge_percent
   .pledge_deadline
   
 and methods:
