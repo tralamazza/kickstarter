@@ -1,4 +1,4 @@
-require 'rubygems'
+require "rubygems"
 require "nokogiri"
 require "em-http-request"
 require "kickstarter/version"
@@ -77,19 +77,26 @@ module Kickstarter
 
         start_page += 1 # skip the one we just read
         pages = options.fetch(:pages, :all)
-        end_page = doc.css(".pagination a:nth-last-of-type(2)").text.to_i
-        end_page = start_page + pages - 2 unless pages == :all
+        if pages == :all
+          end_page = doc.css(".pagination a:nth-last-of-type(2)").text.to_i
+        elsif
+          end_page = start_page + pages - 2
+        end
         EM.stop if start_page > end_page
 
         processed = 0 # counter
         # create one request per page
-        multi = (start_page .. end_page).map { |p| EM::HttpRequest.new("#{url}?page=#{p}").get }
+        multi = (start_page .. end_page).map { |p|
+          EM::HttpRequest.new("#{url}?page=#{p}").get
+        }
         multi.each do |multi_http|
+          multi_http.errback do
+            processed += 1
+            EM.stop if processed == multi.length
+          end
           multi_http.callback do
             nodes = Nokogiri::HTML(multi_http.response).css('.project')
-            nodes.each { |node|
-              block.call(Kickstarter::Project.new(node))
-            } unless nodes.empty?
+            nodes.each { |node| block.call(Kickstarter::Project.new(node)) }
             processed += 1
             EM.stop if processed == multi.length
           end

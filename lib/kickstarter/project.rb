@@ -70,7 +70,7 @@ module Kickstarter
         :owner           => owner,
         :pledge_amount   => pledge_amount,
         :pledge_percent  => pledge_percent,
-        :pledge_deadline => pledge_deadline,
+        :pledge_deadline => pledge_deadline.to_s,
         :thumbnail_url   => thumbnail_url
       }
     end
